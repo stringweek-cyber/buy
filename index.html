@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>견적서 → 품목내역</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+  :root{
+    --bg:#f4f6f5; --card:#fff; --ink:#1d2321; --sub:#7a8580; --line:#e6eae8;
+    --main:#12a372; --main-d:#0e8a60; --soft:#e9f7f1; --warn:#c2410c; --warn-bg:#fff4ec;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);
+    font-family:"Pretendard","Apple SD Gothic Neo","Malgun Gothic",sans-serif;}
+  .wrap{max-width:820px;margin:0 auto;padding:32px 16px 60px}
+  .hero{display:flex;align-items:center;justify-content:center;gap:16px;flex-wrap:wrap;margin:8px 0 26px}
+  .hero .icons{display:inline-flex;align-items:center;gap:10px}
+  .hero .ic{width:52px;height:52px;border-radius:15px;background:var(--soft);
+    display:grid;place-items:center;color:var(--main)}
+  .hero .ic.out{background:var(--main);color:#fff;box-shadow:0 6px 16px rgba(18,163,114,.28)}
+  .hero .to{color:#b5c7bf}
+  .hero svg{display:block}
+  h1{font-size:24px;margin:0;letter-spacing:-.02em;font-weight:800}
+  h1 .arr{color:var(--main);font-weight:600;margin:0 4px}
+  .drop{display:block;background:var(--card);border:2px dashed #cfd8d4;border-radius:16px;
+    padding:44px 16px;text-align:center;cursor:pointer;transition:.15s}
+  .drop:hover,.drop.on{border-color:var(--main);background:var(--soft)}
+  .drop b{font-size:17px}
+  .drop p{margin:6px 0 0;color:var(--sub);font-size:14px}
+  .card{background:var(--card);border-radius:16px;margin-top:16px;padding:8px 0 0;overflow:hidden}
+  table{width:100%;border-collapse:collapse;font-size:14px}
+  th,td{padding:11px 14px;border-bottom:1px solid var(--line);text-align:left}
+  th{color:var(--sub);font-weight:500;font-size:13px}
+  td.n,th.n{text-align:right;white-space:nowrap}
+  td.no{color:var(--sub);width:56px;white-space:nowrap;cursor:grab;touch-action:none;user-select:none}
+  td.no .grip{margin-right:6px;color:#b5bfba}
+  .hint{margin:8px 14px 4px;padding:9px 12px;border-radius:10px;background:var(--soft);
+    color:var(--main-d);font-size:13px}
+  .hint .grip{font-weight:700;margin-right:2px}
+  tr.dragging{background:var(--soft);box-shadow:0 2px 10px rgba(0,0,0,.08)}
+  tr.dragging td.no{cursor:grabbing}
+  td.name{word-break:break-all}
+  td.name:focus{outline:2px solid var(--main);outline-offset:-2px;border-radius:4px}
+  .foot{display:flex;align-items:center;justify-content:space-between;gap:12px;
+    padding:16px 14px;flex-wrap:wrap}
+  .sum{font-size:15px}
+  .sum strong{font-size:20px;color:var(--main);margin-left:6px}
+  .ok{color:var(--main);font-size:13px;margin-left:8px}
+  .bad{color:var(--warn);font-size:13px;margin-left:8px}
+  button{border:0;border-radius:10px;padding:12px 22px;font-size:15px;font-weight:600;
+    background:var(--main);color:#fff;cursor:pointer;font-family:inherit}
+  button:hover{background:var(--main-d)}
+  .msg{margin-top:12px;padding:12px 14px;border-radius:10px;background:var(--warn-bg);
+    color:var(--warn);font-size:14px;display:none}
+  .hide{display:none}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="hero">
+    <div class="icons" aria-hidden="true">
+      <span class="ic">
+        <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/><path d="M9 13h6M9 17h4"/>
+        </svg>
+      </span>
+      <span class="to">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M5 12h14M13 6l6 6-6 6"/>
+        </svg>
+      </span>
+      <span class="ic out">
+        <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="3.5" y="4" width="17" height="16" rx="2"/><path d="M3.5 9.5h17M3.5 15h17M9.5 4v16"/>
+        </svg>
+      </span>
+    </div>
+    <h1>견적서를 엑셀로 바꾸기</h1>
+  </header>
+
+  <label class="drop" id="drop">
+    <b>견적서 파일을 드래그해서 넣으세요.</b>
+    <p>G마켓 견적서(.xls)</p>
+    <input type="file" id="file" accept=".xls,.html,.htm" hidden>
+  </label>
+  <div class="msg" id="msg"></div>
+
+  <div class="card hide" id="result">
+    <div class="hint"><span class="grip">⠿</span> 번호를 잡고 위아래로 드래그하면 순서를 바꿀 수 있어요.</div>
+    <table>
+      <thead><tr><th>#</th><th>내용</th><th class="n">수량</th><th class="n">예상단가</th></tr></thead>
+      <tbody id="rows"></tbody>
+    </table>
+    <div class="foot">
+      <div class="sum">합계<strong id="total">0원</strong><span id="check"></span></div>
+      <button id="down">견적서.xls 다운로드</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+let items = [];      // {name, price}
+let expected = null; // 견적서의 총 구매금액
+
+const num = s => Number(String(s).replace(/[^0-9.-]/g, '')) || 0;
+const won = n => n.toLocaleString('ko-KR') + '원';
+const clean = s => s.replace(/\s+/g, ' ').trim();
+
+function showMsg(t){ $('msg').textContent = t; $('msg').style.display = t ? 'block' : 'none'; }
+
+// 파일 읽기 (UTF-8 우선, 깨지면 EUC-KR)
+async function readText(file){
+  const buf = await file.arrayBuffer();
+  let t = new TextDecoder('utf-8').decode(buf);
+  if (t.includes('�')) t = new TextDecoder('euc-kr').decode(buf);
+  return t;
+}
+
+// G마켓 견적서(HTML 표) 해석
+function parse(html){
+  const doc = new DOMParser().parseFromString(html, 'text/html');
+  const list = doc.querySelector('table.list tbody');
+  if (!list) throw new Error('견적서 표를 찾지 못했어요. G마켓 견적서 파일인지 확인해 주세요.');
+
+  const out = [];
+  list.querySelectorAll(':scope > tr').forEach(tr => {
+    const tds = tr.querySelectorAll(':scope > td');
+    if (tr.querySelector('td.first')) {
+      // 번호 | 상품명 | 공급자명 | 수량 | 공급가액 | 할인금액 | 공급합계
+      out.push({ name: clean(tds[1].textContent), price: num(tds[tds.length - 1].textContent) });
+    } else if (out.length && tds.length) {
+      // 옵션(필수선택/추가구성) 줄 → 상품명 뒤에 붙임
+      const opt = clean(tr.textContent);
+      if (opt) out[out.length - 1].name += ' ' + opt;
+    }
+  });
+
+  let ship = 0; expected = null;
+  doc.querySelectorAll('table.sum tr').forEach(tr => {
+    const th = clean(tr.querySelector('th')?.textContent || '');
+    const v = num(tr.querySelector('td')?.textContent || '');
+    if (th === '배송비') ship = v;
+    if (th === '총 구매금액') expected = v;
+  });
+  if (ship > 0) out.push({ name: '배송비', price: ship });
+
+  if (!out.length) throw new Error('품목을 찾지 못했어요.');
+  return out;
+}
+
+function render(){
+  $('rows').innerHTML = '';
+  items.forEach((it, i) => {
+    const tr = document.createElement('tr');
+    tr.dataset.i = i;
+    tr.innerHTML = `<td class="no" title="끌어서 순서 바꾸기"><span class="grip">⠿</span>${i + 1}</td><td class="name" contenteditable="true"></td>
+      <td class="n">1</td><td class="n">${won(it.price)}</td>`;
+    const nameTd = tr.querySelector('.name');
+    nameTd.textContent = it.name;
+    nameTd.addEventListener('input', () => { it.name = clean(nameTd.textContent); });
+    enableDrag(tr);
+    $('rows').appendChild(tr);
+  });
+  const total = items.reduce((s, it) => s + it.price, 0);
+  $('total').textContent = won(total);
+  const c = $('check');
+  if (expected == null) { c.className = ''; c.textContent = ''; }
+  else if (total === expected) { c.className = 'ok'; c.textContent = '✓ 총 구매금액과 일치'; }
+  else { c.className = 'bad'; c.textContent = `⚠ 총 구매금액 ${won(expected)}과 다름`; }
+  $('result').classList.remove('hide');
+}
+
+// 번호 칸을 잡고 위아래로 끌어 순서 바꾸기 (마우스·터치 공통)
+function enableDrag(tr){
+  const handle = tr.querySelector('td.no');
+  handle.addEventListener('pointerdown', e => {
+    e.preventDefault();
+    tr.classList.add('dragging');
+    document.addEventListener('pointermove', move);
+    document.addEventListener('pointerup', end);
+    document.addEventListener('pointercancel', end);
+  });
+  const move = e => {
+    const body = $('rows');
+    for (const other of body.children) {
+      if (other === tr) continue;
+      const r = other.getBoundingClientRect();
+      const mid = r.top + r.height / 2;
+      const isAbove = other.compareDocumentPosition(tr) & Node.DOCUMENT_POSITION_FOLLOWING;
+      if (isAbove && e.clientY < mid) { body.insertBefore(tr, other); break; }
+      if (!isAbove && e.clientY > mid) { body.insertBefore(tr, other.nextSibling); }
+    }
+  };
+  const end = () => {
+    document.removeEventListener('pointermove', move);
+    document.removeEventListener('pointerup', end);
+    document.removeEventListener('pointercancel', end);
+    tr.classList.remove('dragging');
+    items = [...$('rows').children].map(row => items[row.dataset.i]);
+    render();
+  };
+}
+
+async function load(file){
+  showMsg('');
+  try {
+    items = parse(await readText(file));
+    render();
+  } catch (e) {
+    $('result').classList.add('hide');
+    showMsg(e.message);
+  }
+}
+
+function download(){
+  const aoa = [['내용', '규격', '단위', '수량', '예상단가']];
+  items.forEach(it => aoa.push([it.name, '', '', 1, it.price]));
+  const ws = XLSX.utils.aoa_to_sheet(aoa);
+  ws['!cols'] = [{ wch: 60 }, { wch: 10 }, { wch: 8 }, { wch: 8 }, { wch: 14 }];
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, '품목내역');
+  const data = XLSX.write(wb, { bookType: 'biff8', type: 'array' });
+  const url = URL.createObjectURL(new Blob([data], { type: 'application/vnd.ms-excel' }));
+  const a = document.createElement('a');
+  a.href = url; a.download = '견적서.xls';
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+$('file').addEventListener('change', e => { if (e.target.files[0]) load(e.target.files[0]); e.target.value = ''; });
+$('down').addEventListener('click', download);
+const drop = $('drop');
+['dragenter', 'dragover'].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.add('on'); }));
+['dragleave', 'drop'].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.remove('on'); }));
+drop.addEventListener('drop', e => { const f = e.dataTransfer.files[0]; if (f) load(f); });
+</script>
+</body>
+</html>
