@@ -47,7 +47,7 @@
   .sum{font-size:15px}
   .sum strong{font-size:20px;color:var(--main);margin-left:6px}
   .ok{color:var(--main);font-size:13px;margin-left:8px}
-  .bad{color:var(--warn);font-size:13px;margin-left:8px}
+  .bad{color:#dc2626;font-size:13px;margin-left:8px}
   button{border:0;border-radius:10px;padding:12px 22px;font-size:15px;font-weight:600;
     background:var(--main);color:#fff;cursor:pointer;font-family:inherit}
   button:hover{background:var(--main-d)}
@@ -168,7 +168,13 @@ function render(){
   const c = $('check');
   if (expected == null) { c.className = ''; c.textContent = ''; }
   else if (total === expected) { c.className = 'ok'; c.textContent = '✓ 총 구매금액과 일치'; }
-  else { c.className = 'bad'; c.textContent = `⚠ 총 구매금액 ${won(expected)}과 다름`; }
+  else {
+    const diff = total - expected;
+    c.className = 'bad';
+    c.textContent = diff > 0
+      ? `⚠ 총 구매금액 ${won(expected)}과 ${won(diff)} 차이 (할인 금액으로 추정)`
+      : `⚠ 총 구매금액 ${won(expected)}과 ${won(-diff)} 차이`;
+  }
   $('result').classList.remove('hide');
 }
 
